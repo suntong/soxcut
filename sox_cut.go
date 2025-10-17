@@ -15,21 +15,20 @@ import (
 // ============================ CONFIGURATION ===================================
 
 const (
-	// The input audio file (e.g., wav, mp3, flac).
-	inputFile = "input.mp3"
-
-	// The desired output file.
-	outputFile = "output.mp3"
-
-	// The file containing the start and end times for each clip.
-	// Format per line: HH:MM:SS.mmm HH:MM:SS.mmm (e.g., 00:01:10.500 00:01:15.500)
-	timingsFile = "test/segments.txt"
-
 	// The duration of the cross-fade overlap.
 	excessDuration = 500 * time.Millisecond
 
 	// The search window for finding the best splice point.
 	leewayDuration = 200 * time.Millisecond
+)
+
+var (
+	// The file containing the start and end times for each clip.
+	// Format per line: HH:MM:SS.mmm HH:MM:SS.mmm (e.g., 00:01:10.500 00:01:15.500)
+	timingsFile = "test/segments.txt"
+
+	inputFile  string
+	outputFile string
 )
 
 // ========================== END OF CONFIGURATION ==============================
@@ -41,15 +40,43 @@ type ClipTiming struct {
 }
 
 func main() {
-	log.Println("Go Audio Splicer started.")
+	log.Println("Audio Splicer started.")
 
-	// 1. Sanity Checks
+	// Parse Command-Line Arguments
+	args := os.Args[1:]
+	if len(args) < 2 {
+		fmt.Println("Usage: go run main.go <inputFile> <outputFile> [timingsFile] [sox_options...]")
+		fmt.Println("\nExample (WAV to MP3):")
+		fmt.Println("  go run main.go input.wav output.mp3 timings.txt -C 192")
+		fmt.Println("\nExample (WAV to Opus):")
+		fmt.Println("  go run main.go audio.flac final.opus timings.txt -C 128k")
+		os.Exit(0)
+	}
+
+	inputFile = args[0]
+	outputFile = args[1]
+	//timingsFilePath := defaultTimingsFile
+	var soxOptions []string
+
+	if len(args) > 2 {
+		// Check if the third argument is a potential timings file or a sox option
+		if !strings.HasPrefix(args[2], "-") {
+			timingsFile = args[2]
+			if len(args) > 3 {
+				soxOptions = args[3:]
+			}
+		} else {
+			soxOptions = args[2:]
+		}
+	}
+
+	// Dependency Check: Ensure sox is installed.
 	if !commandExists("sox") {
 		log.Fatal("SoX not found in PATH. Please install it to continue.")
 	}
-	log.Println("Found SoX executable.")
+	//log.Println("Found SoX executable.")
 
-	// 2. Read and parse the clip timings file.
+	// Read and parse the clip timings file.
 	timings, err := parseTimingsFile(timingsFile)
 	if err != nil {
 		log.Fatalf("Error reading timings file '%s': %v", timingsFile, err)
@@ -57,33 +84,39 @@ func main() {
 	if len(timings) == 0 {
 		log.Fatal("No clip timings found in the file. Exiting.")
 	}
-	log.Printf("Found %d clip(s) to process.", len(timings))
+	log.Printf("Found %d clip(s) to process from '%s'.", len(timings), timingsFile)
 
-	// 3. Create a temporary directory for intermediate files.
-	tempDir, err := os.MkdirTemp("", "go_audio_splice_*")
+	// Create a temporary directory for intermediate files.
+	tempDir, err := os.MkdirTemp("", "sc_*")
 	if err != nil {
 		log.Fatalf("Failed to create temporary directory: %v", err)
 	}
 	defer os.RemoveAll(tempDir)
 	log.Printf("Temporary directory created at: %s", tempDir)
 
-	// 4. Extract and prepare all clips for splicing.
+	// Extract and prepare all clips for splicing.
 	preparedClipPaths, err := prepareClips(timings, tempDir)
 	if err != nil {
 		log.Fatalf("Failed during clip preparation: %v", err)
 	}
 	log.Println("All clips extracted and prepared successfully.")
 
-	// 5. Splice the prepared clips together.
-	finalClipPath, err := spliceClips(preparedClipPaths, tempDir)
+	// Splice the prepared clips together.
+	finalClipPath, err := spliceClips(preparedClipPaths, timings, tempDir)
 	if err != nil {
 		log.Fatalf("Failed during splicing: %v", err)
 	}
 	log.Println("All clips spliced successfully.")
 
-	// 6. Move the final result to the output file.
-	if err := os.Rename(finalClipPath, outputFile); err != nil {
-		log.Fatalf("Failed to move final file to '%s': %v", outputFile, err)
+	// Perform final encode to the output file, with user options.
+	//   sox <input> <output> <options>
+	finalCmdArgs := []string{finalClipPath, outputFile}
+	finalCmdArgs = append(finalCmdArgs, soxOptions...)
+	log.Printf("Encoding final file with\n\t\t '%v'...", finalCmdArgs)
+
+	cmd := exec.Command("sox", finalCmdArgs...)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		log.Fatalf("Failed to execute final sox command: %v\nOutput: %s", err, string(output))
 	}
 
 	log.Println("-----------------------------------")
@@ -130,7 +163,8 @@ func prepareClips(timings []ClipTiming, tempDir string) ([]string, error) {
 			trimStart = 0
 		}
 
-		log.Printf(" -> Preparing clip %d: trimming from %.3fs for %.3fs", i+1, trimStart.Seconds(), trimDuration.Seconds())
+		log.Printf(" -> Preparing clip %d: trimming from %v for %.3fs (%.3fs)",
+			i+1, trimStart, idealDuration.Seconds(), trimDuration.Seconds())
 
 		cmd := exec.Command("sox", inputFile, clipPath, "trim",
 			fmt.Sprintf("%f", trimStart.Seconds()),
@@ -145,15 +179,16 @@ func prepareClips(timings []ClipTiming, tempDir string) ([]string, error) {
 }
 
 // spliceClips iteratively joins the prepared clips using the splice effect.
-func spliceClips(clipPaths []string, tempDir string) (string, error) {
+func spliceClips(clipPaths []string, timings []ClipTiming, tempDir string) (string, error) {
 	if len(clipPaths) <= 1 {
 		return clipPaths[0], nil // Only one clip, no splicing needed.
 	}
 
 	currentCombinedFile := clipPaths[0]
+	accumulatedIdealDuration := timings[0].End - timings[0].Start
 
 	for i := 1; i < len(clipPaths); i++ {
-		log.Printf(" -> Splicing clip %d onto the result...", i+1)
+		log.Printf(" -> Splicing clip %d at joint point: %.3fs", i+1, accumulatedIdealDuration.Seconds())
 		nextClip := clipPaths[i]
 		tempOutputFile := filepath.Join(tempDir, fmt.Sprintf("combined_%d.wav", i))
 
@@ -171,6 +206,7 @@ func spliceClips(clipPaths []string, tempDir string) (string, error) {
 			return "", fmt.Errorf("failed to splice clip %d: %v\nOutput: %s", i+1, err, string(output))
 		}
 		currentCombinedFile = tempOutputFile
+		accumulatedIdealDuration += (timings[i].End - timings[i].Start)
 	}
 	return currentCombinedFile, nil
 }
