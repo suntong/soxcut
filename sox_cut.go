@@ -24,7 +24,7 @@ const (
 
 var (
 	// The file containing the start and end times for each clip.
-	// Format per line: HH:MM:SS.mmm HH:MM:SS.mmm (e.g., 00:01:10.500 00:01:15.500)
+	// Format per line: HH:MM:SS.mmm HH:MM:SS.mmm (e.g., 00:01:10 00:01:15.6)
 	timingsFile = "test/segments.txt"
 
 	inputFile  string
@@ -251,11 +251,11 @@ func parseTimingsFile(filePath string) ([]ClipTiming, error) {
 			return nil, fmt.Errorf("line %d: expected 2 fields (start and end time), got %d", lineNumber, len(parts))
 		}
 
-		start, err := parseSoxTime(parts[0])
+		start, err := parseISOTime(parts[0])
 		if err != nil {
 			return nil, fmt.Errorf("line %d: invalid start time format '%s': %w", lineNumber, parts[0], err)
 		}
-		end, err := parseSoxTime(parts[1])
+		end, err := parseISOTime(parts[1])
 		if err != nil {
 			return nil, fmt.Errorf("line %d: invalid end time format '%s': %w", lineNumber, parts[1], err)
 		}
@@ -265,49 +265,24 @@ func parseTimingsFile(filePath string) ([]ClipTiming, error) {
 	return timings, scanner.Err()
 }
 
-// parseSoxTime converts a HH:MM:SS.mmm string to a time.Duration.
-func parseSoxTime(s string) (time.Duration, error) {
+var durationFormat = []string{"", "05", "04:05", "15:04:05"}
+var d0, _ = time.Parse("15:04:05", "00:00:00")
+
+// parseISOTime converts a [[HH:]MM:]SS[.mmm] string to a time.Duration.
+func parseISOTime(s string) (time.Duration, error) {
 	parts := strings.Split(s, ":")
-	if len(parts) != 3 {
-		return 0, fmt.Errorf("invalid time format, expected HH:MM:SS.mmm")
+	numParts := len(parts)
+
+	if numParts == 0 || numParts > 3 {
+		return 0, fmt.Errorf("invalid time format, expected [[HH:]MM:]SS[.mmm]")
 	}
 
-	h, err := strconv.Atoi(parts[0])
+	dur, err := time.Parse(durationFormat[numParts], s)
 	if err != nil {
-		return 0, fmt.Errorf("invalid hours: %w", err)
+		return 0, err
 	}
 
-	m, err := strconv.Atoi(parts[1])
-	if err != nil {
-		return 0, fmt.Errorf("invalid minutes: %w", err)
-	}
-
-	secParts := strings.Split(parts[2], ".")
-	if len(secParts) > 2 {
-		return 0, fmt.Errorf("invalid seconds format")
-	}
-	sec, err := strconv.Atoi(secParts[0])
-	if err != nil {
-		return 0, fmt.Errorf("invalid seconds: %w", err)
-	}
-
-	ms := 0
-	if len(secParts) == 2 {
-		// Pad with zeros to handle cases like .5 -> 500ms
-		msStr := secParts[1]
-		for len(msStr) < 3 {
-			msStr += "0"
-		}
-		ms, err = strconv.Atoi(msStr[:3]) // Take only first 3 digits
-		if err != nil {
-			return 0, fmt.Errorf("invalid milliseconds: %w", err)
-		}
-	}
-
-	return time.Hour*time.Duration(h) +
-		time.Minute*time.Duration(m) +
-		time.Second*time.Duration(sec) +
-		time.Millisecond*time.Duration(ms), nil
+	return dur.Sub(d0), nil
 }
 
 // commandExists checks if a command is available in the system's PATH.
