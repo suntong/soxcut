@@ -14,15 +14,13 @@ import (
 
 // ============================ CONFIGURATION ===================================
 
-const (
+var (
 	// The duration of the cross-fade overlap.
 	excessDuration = 500 * time.Millisecond
 
 	// The search window for finding the best splice point.
 	leewayDuration = 200 * time.Millisecond
-)
 
-var (
 	// The file containing the start and end times for each clip.
 	// Format per line: HH:MM:SS.mmm HH:MM:SS.mmm (e.g., 00:01:10 00:01:15.6)
 	timingsFile = "test/segments.txt"
@@ -39,36 +37,14 @@ type ClipTiming struct {
 	End   time.Duration
 }
 
-func soxcut() {
-	log.Println("Audio Splicer started.")
+func soxcut(args []string) {
 
-	// Parse Command-Line Arguments
-	args := os.Args[1:]
-	if len(args) < 2 {
-		fmt.Println("Usage: go run main.go <inputFile> <outputFile> [timingsFile] [sox_options...]")
-		fmt.Println("\nExample (WAV to MP3):")
-		fmt.Println("  go run main.go input.wav output.mp3 timings.txt -C 192")
-		fmt.Println("\nExample (WAV to Opus):")
-		fmt.Println("  go run main.go audio.flac final.opus timings.txt -C 128k")
-		os.Exit(0)
-	}
-
-	inputFile = args[0]
-	outputFile = args[1]
-	//timingsFilePath := defaultTimingsFile
-	var soxOptions []string
-
-	if len(args) > 2 {
-		// Check if the third argument is a potential timings file or a sox option
-		if !strings.HasPrefix(args[2], "-") {
-			timingsFile = args[2]
-			if len(args) > 3 {
-				soxOptions = args[3:]
-			}
-		} else {
-			soxOptions = args[2:]
-		}
-	}
+	excessDuration = time.Duration(spliceCommand.DurExcess) * time.Millisecond
+	leewayDuration = time.Duration(spliceCommand.DurLeeway) * time.Millisecond
+	inputFile = spliceCommand.FileI
+	outputFile = spliceCommand.FileO
+	timingsFile = spliceCommand.FileS
+	var soxOptions []string = args
 
 	// Dependency Check: Ensure sox is installed.
 	if !commandExists("sox") {
@@ -76,6 +52,8 @@ func soxcut() {
 	}
 	//log.Println("Found SoX executable.")
 
+	log.Printf("Audio Splicer started with excess: %v, leeway: %v\n",
+		excessDuration, leewayDuration)
 	// Read and parse the clip timings file.
 	timings, err := parseTimingsFile(timingsFile)
 	if err != nil {
@@ -110,7 +88,10 @@ func soxcut() {
 
 	// Perform final encode to the output file, with user options.
 	//   sox <input> <output> <options>
-	finalCmdArgs := []string{finalClipPath, outputFile}
+	finalCmdArgs := []string{finalClipPath}
+	foptArgs := strings.Fields(spliceCommand.FmtOpt)
+	finalCmdArgs = append(finalCmdArgs, foptArgs...)
+	finalCmdArgs = append(finalCmdArgs, outputFile)
 	finalCmdArgs = append(finalCmdArgs, soxOptions...)
 	log.Printf("Encoding final file with\n\t\t '%v'...", finalCmdArgs)
 

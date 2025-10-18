@@ -19,7 +19,7 @@ Options:
 
   - Name: Force
     Type: bool
-    Flag: f,force
+    Flag: F,force
     #EnvV: true
     Usage: Force
 
@@ -27,8 +27,17 @@ Command:
 
   - Name: splice
     Desc: sox splice for smooth transition
-    Text: ''
-    #Text: 'Usage:\n  soxcut splice [Options]'
+    Text: |
+      Example:
+      //    soxcut splice -i <inputFile> -s <segmentsFile> -o <outputFile> [sox_effects...]
+      //    soxcut splice -i input1.wav -s timings.txt -o output.mp3 -f="-C 128"
+      //    soxcut splice -i audio.flac -s timings.txt -o final.opus -f="-C 16" -v -- gain -n highpass 80 pad 0 5
+    Test: |
+      Usage: soxcut splice -i <inputFile> -o <outputFile> [-s segmentsFile] [sox_options...]
+      //  Example (WAV to MP3):
+      //    soxcut splice -i input.wav -o output.mp3 -s timings.txt -C 192
+      //  Example (WAV to Opus):
+      //    soxcut splice -i audio.flac -o final.opus -s timings.txt -C 64k
 
     Options:
 
@@ -66,3 +75,9 @@ Command:
         EnvV: true
         Value: output.mp3
         Usage: the final output file
+
+      - Name: FmtOpt
+        Type: string
+        Flag: f,fopts
+        EnvV: true
+        Usage: fopts (format options) for the output file

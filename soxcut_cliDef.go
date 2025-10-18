@@ -80,7 +80,7 @@ import (
 
 // The OptsT type defines all the configurable options from cli.
 type OptsT struct {
-	Force   bool   `short:"f" long:"force" description:"Force"`
+	Force   bool   `short:"F" long:"force" description:"Force"`
 	Verbflg func() `short:"v" long:"verbose" description:"Verbose mode (Multiple -v options increase the verbosity)"`
 	Verbose int
 	Version func() `short:"V" long:"version" description:"Show program version and exit"`
@@ -116,6 +116,7 @@ type OptsT struct {
 //  	FileI	string	`short:"i" long:"input" env:"SOXCUT_FILEI" description:"the source to cut from (mandatory)" required:"true"`
 //  	FileS	string	`short:"s" long:"segments" env:"SOXCUT_FILES" description:"the segments definition file (mandatory)" required:"true"`
 //  	FileO	string	`short:"o" long:"output" env:"SOXCUT_FILEO" description:"the final output file" default:"output.mp3"`
+//  	FmtOpt	string	`short:"f" long:"fopts" env:"SOXCUT_FMTOPT" description:"fopts (format options) for the output file"`
 //  }
 
 //
@@ -127,7 +128,12 @@ type OptsT struct {
 //  func init() {
 //  	gfParser.AddCommand("splice",
 //  		"sox splice for smooth transition",
-//  		"",
+//  		`Example:
+//    soxcut splice -i <inputFile> -s <segmentsFile> -o <outputFile> [sox_effects...]
+//    soxcut splice -i input1.wav -s timings.txt -o output.mp3 -f="-C 128"
+//    soxcut splice -i audio.flac -s timings.txt -o final.opus -f="-C 16" -v -- gain -n highpass 80 pad 0 5
+
+//  `,
 //  		&spliceCommand)
 //  }
 //
@@ -136,7 +142,7 @@ type OptsT struct {
 //   	// fmt.Fprintf(os.Stderr, "Copyright (C) 2025-2025, Tong Sun\n\n")
 //   	clis.Setup("soxcut::splice", Opts.Verbose)
 //   	clis.Verbose(1, "Doing Splice, with %+v, %+v", Opts, args)
-//   	// fmt.Println(x.DurExcess, x.DurLeeway, x.FileI, x.FileS, x.FileO)
+//   	// fmt.Println(x.DurExcess, x.DurLeeway, x.FileI, x.FileS, x.FileO, x.FmtOpt)
 //  	return x.Exec(args)
 //  }
 //
