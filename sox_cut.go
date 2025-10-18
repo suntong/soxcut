@@ -39,7 +39,7 @@ type ClipTiming struct {
 	End   time.Duration
 }
 
-func main() {
+func soxcut() {
 	log.Println("Audio Splicer started.")
 
 	// Parse Command-Line Arguments

@@ -1,0 +1,68 @@
+# GoFlags based cli def file
+
+# program name, name for the executable
+ProgramName: soxcut
+Authors: Tong Sun
+Since: 2025
+
+PackageName: main
+
+Name: soxcut
+Desc: sox cut tool
+Text: Audio file manipulating with sox
+Verbose: true
+Version: true
+
+#UsageLead: "Usage:\\n  soxcut [Options] dir [dirs...]"
+
+Options:
+
+  - Name: Force
+    Type: bool
+    Flag: f,force
+    #EnvV: true
+    Usage: Force
+
+Command:
+
+  - Name: splice
+    Desc: sox splice for smooth transition
+    Text: ''
+    #Text: 'Usage:\n  soxcut splice [Options]'
+
+    Options:
+
+      - Name: DurExcess
+        Type: int
+        Flag: E,excess
+        EnvV: true
+        Usage: excess duration of the cross-fade overlap in ms
+        Value: 500
+
+      - Name: DurLeeway
+        Type: int
+        Flag: L,leeway
+        EnvV: true
+        Usage: leeway duration for finding best splice point in ms
+        Value: 200
+
+      - Name: FileI
+        Type: string
+        Flag: i,input
+        EnvV: true
+        Usage: the source to cut from (mandatory)
+        Required: true
+
+      - Name: FileS
+        Type: string
+        Flag: s,segments
+        EnvV: true
+        Usage: the segments definition file (mandatory)
+        Required: true
+
+      - Name: FileO
+        Type: string
+        Flag: o,output
+        EnvV: true
+        Value: output.mp3
+        Usage: the final output file
