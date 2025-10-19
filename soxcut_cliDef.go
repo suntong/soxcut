@@ -31,7 +31,7 @@ import (
 //  var (
 //          progname  = "soxcut"
 //          version   = "0.1.0"
-//          date = "2025-10-18"
+//          date = "2025-10-19"
 
 //  	// Opts store all the configurable options
 //  	Opts OptsT
@@ -128,7 +128,7 @@ type OptsT struct {
 //  	gfParser.AddCommand("extract",
 //  		"extract segments from source and splice them for smooth transition",
 //  		`Example:
-//    soxcut extract -i <inputFile> -s <segmentsFile> -o <outputFile> [sox_effects...]
+//    soxcut extract -i <inputFile> -s <segmentsFile> [-o <outputFile>] [sox_effects...]
 //    soxcut extract -i input1.wav -s timings.txt -o output.mp3 -f="-C 128"
 //    soxcut extract -i audio.flac -s timings.txt -o final.opus -f="-C 16" -v -- gain -n highpass 80 pad 0 5
 
@@ -191,7 +191,8 @@ type OptsT struct {
 //  	gfParser.AddCommand("splice",
 //  		"splice sources for smooth transition",
 //  		`Example:
-//    soxcut splice -l <listFile> -o <outputFile> [sox_effects...]
+//    soxcut splice -l <listFile> [-o <outputFile>] [sox_effects...]
+//    soxcut splice -l audio-files.lst -E 200 -L 100 -- compand 0.3,1 6:-70,-60,-20,-10,-5,-5 0 -90 0.1 rate 96k pad 0.5 15
 
 //  `,
 //  		&spliceCommand)
