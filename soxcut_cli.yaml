@@ -8,7 +8,7 @@ Since: 2025
 PackageName: main
 
 Name: soxcut
-Desc: sox cut tool
+Desc: sox wrapper tool
 Text: Audio file manipulating with sox
 Verbose: true
 Version: true
@@ -17,43 +17,50 @@ Version: true
 
 Options:
 
-  - Name: Force
-    Type: bool
-    Flag: F,force
-    #EnvV: true
-    Usage: Force
+  - Name: DurExcess
+    Type: int
+    Flag: E,excess
+    EnvV: true
+    Usage: excess duration of the cross-fade overlap in ms
+    Value: 500
+
+  - Name: DurLeeway
+    Type: int
+    Flag: L,leeway
+    EnvV: true
+    Usage: leeway duration for finding best splice point in ms
+    Value: 200
+
+  - Name: FileO
+    Type: string
+    Flag: o,output
+    EnvV: true
+    Value: output.mp3
+    Usage: the final output file
+
+  - Name: FmtOpt
+    Type: string
+    Flag: f,fopts
+    EnvV: true
+    Usage: fopts (format options) for the output file
 
 Command:
 
-  - Name: splice
-    Desc: sox splice for smooth transition
+  - Name: extract
+    Desc: extract segments from source and splice them for smooth transition
     Text: |
       Example:
-      //    soxcut splice -i <inputFile> -s <segmentsFile> -o <outputFile> [sox_effects...]
-      //    soxcut splice -i input1.wav -s timings.txt -o output.mp3 -f="-C 128"
-      //    soxcut splice -i audio.flac -s timings.txt -o final.opus -f="-C 16" -v -- gain -n highpass 80 pad 0 5
+      //    soxcut extract -i <inputFile> -s <segmentsFile> -o <outputFile> [sox_effects...]
+      //    soxcut extract -i input1.wav -s timings.txt -o output.mp3 -f="-C 128"
+      //    soxcut extract -i audio.flac -s timings.txt -o final.opus -f="-C 16" -v -- gain -n highpass 80 pad 0 5
     Test: |
-      Usage: soxcut splice -i <inputFile> -o <outputFile> [-s segmentsFile] [sox_options...]
+      Usage: soxcut extract -i <inputFile> -o <outputFile> [-s segmentsFile] [sox_options...]
       //  Example (WAV to MP3):
-      //    soxcut splice -i input.wav -o output.mp3 -s timings.txt -C 192
+      //    soxcut extract -i input.wav -o output.mp3 -s timings.txt -C 192
       //  Example (WAV to Opus):
-      //    soxcut splice -i audio.flac -o final.opus -s timings.txt -C 64k
+      //    soxcut extract -i audio.flac -o final.opus -s timings.txt -C 64k
 
     Options:
-
-      - Name: DurExcess
-        Type: int
-        Flag: E,excess
-        EnvV: true
-        Usage: excess duration of the cross-fade overlap in ms
-        Value: 500
-
-      - Name: DurLeeway
-        Type: int
-        Flag: L,leeway
-        EnvV: true
-        Usage: leeway duration for finding best splice point in ms
-        Value: 200
 
       - Name: FileI
         Type: string
@@ -69,15 +76,17 @@ Command:
         Usage: the segments definition file (mandatory)
         Required: true
 
-      - Name: FileO
-        Type: string
-        Flag: o,output
-        EnvV: true
-        Value: output.mp3
-        Usage: the final output file
+  - Name: splice
+    Desc: splice sources for smooth transition
+    Text: |
+      Example:
+      //    soxcut splice -l <listFile> -o <outputFile> [sox_effects...]
 
-      - Name: FmtOpt
+    Options:
+
+      - Name: FileList
         Type: string
-        Flag: f,fopts
+        Flag: l,list
         EnvV: true
-        Usage: fopts (format options) for the output file
+        Usage: the list file containing sources to splice (mandatory)
+        Required: true

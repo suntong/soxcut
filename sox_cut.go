@@ -39,11 +39,11 @@ type ClipTiming struct {
 
 func soxcut(args []string) {
 
-	excessDuration = time.Duration(spliceCommand.DurExcess) * time.Millisecond
-	leewayDuration = time.Duration(spliceCommand.DurLeeway) * time.Millisecond
-	inputFile = spliceCommand.FileI
-	outputFile = spliceCommand.FileO
-	timingsFile = spliceCommand.FileS
+	excessDuration = time.Duration(Opts.DurExcess) * time.Millisecond
+	leewayDuration = time.Duration(Opts.DurLeeway) * time.Millisecond
+	inputFile = extractCommand.FileI
+	outputFile = Opts.FileO
+	timingsFile = extractCommand.FileS
 	var soxOptions []string = args
 
 	// Dependency Check: Ensure sox is installed.
@@ -89,7 +89,7 @@ func soxcut(args []string) {
 	// Perform final encode to the output file, with user options.
 	//   sox <input> <output> <options>
 	finalCmdArgs := []string{finalClipPath}
-	foptArgs := strings.Fields(spliceCommand.FmtOpt)
+	foptArgs := strings.Fields(Opts.FmtOpt)
 	finalCmdArgs = append(finalCmdArgs, foptArgs...)
 	finalCmdArgs = append(finalCmdArgs, outputFile)
 	finalCmdArgs = append(finalCmdArgs, soxOptions...)
@@ -169,7 +169,7 @@ func spliceClips(clipPaths []string, timings []ClipTiming, tempDir string) (stri
 	accumulatedIdealDuration := timings[0].End - timings[0].Start
 
 	for i := 1; i < len(clipPaths); i++ {
-		log.Printf(" -> Splicing clip %d at joint point: %.3fs", i+1, accumulatedIdealDuration.Seconds())
+		log.Printf(" -> Splicing clip %d at joint point: %v", i+1, accumulatedIdealDuration)
 		nextClip := clipPaths[i]
 		tempOutputFile := filepath.Join(tempDir, fmt.Sprintf("combined_%d.wav", i))
 

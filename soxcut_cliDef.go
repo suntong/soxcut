@@ -1,4 +1,4 @@
-// soxcut - sox cut tool
+// soxcut - sox wrapper tool
 //
 // Audio file manipulating with sox
 
@@ -6,7 +6,7 @@ package main
 
 ////////////////////////////////////////////////////////////////////////////
 // Program: soxcut
-// Purpose: sox cut tool
+// Purpose: sox wrapper tool
 // Authors: Tong Sun (c) 2025-2025, All rights reserved
 ////////////////////////////////////////////////////////////////////////////
 
@@ -63,7 +63,7 @@ import (
 //  // support functions
 //
 //  func showVersion() {
-//   	fmt.Fprintf(os.Stderr, "soxcut - sox cut tool, version %s\n", version)
+//   	fmt.Fprintf(os.Stderr, "soxcut - sox wrapper tool, version %s\n", version)
 //  	fmt.Fprintf(os.Stderr, "Built on %s\n", date)
 //   	fmt.Fprintf(os.Stderr, "Copyright (C) 2025-2025, Tong Sun\n\n")
 //  	fmt.Fprintf(os.Stderr, "Audio file manipulating with sox\n")
@@ -80,18 +80,85 @@ import (
 
 // The OptsT type defines all the configurable options from cli.
 type OptsT struct {
-	Force   bool   `short:"F" long:"force" description:"Force"`
-	Verbflg func() `short:"v" long:"verbose" description:"Verbose mode (Multiple -v options increase the verbosity)"`
-	Verbose int
-	Version func() `short:"V" long:"version" description:"Show program version and exit"`
+	DurExcess int    `short:"E" long:"excess" env:"SOXCUT_DUREXCESS" description:"excess duration of the cross-fade overlap in ms" default:"500"`
+	DurLeeway int    `short:"L" long:"leeway" env:"SOXCUT_DURLEEWAY" description:"leeway duration for finding best splice point in ms" default:"200"`
+	FileO     string `short:"o" long:"output" env:"SOXCUT_FILEO" description:"the final output file" default:"output.mp3"`
+	FmtOpt    string `short:"f" long:"fopts" env:"SOXCUT_FMTOPT" description:"fopts (format options) for the output file"`
+	Verbflg   func() `short:"v" long:"verbose" description:"Verbose mode (Multiple -v options increase the verbosity)"`
+	Verbose   int
+	Version   func() `short:"V" long:"version" description:"Show program version and exit"`
 }
 
 // Template for type define ends here
 
+// Template for "extract" CLI handling starts here
+////////////////////////////////////////////////////////////////////////////
+// Program: soxcut
+// Purpose: sox wrapper tool
+// Authors: Tong Sun (c) 2025-2025, All rights reserved
+////////////////////////////////////////////////////////////////////////////
+
+//  package main
+
+//  import (
+//  	"fmt"
+//  	"os"
+//
+//  	"github.com/go-easygen/go-flags/clis"
+//  )
+
+// *** Sub-command: extract ***
+
+////////////////////////////////////////////////////////////////////////////
+// Constant and data type/structure definitions
+
+// The ExtractCommand type defines all the configurable options from cli.
+//  type ExtractCommand struct {
+//  	FileI	string	`short:"i" long:"input" env:"SOXCUT_FILEI" description:"the source to cut from (mandatory)" required:"true"`
+//  	FileS	string	`short:"s" long:"segments" env:"SOXCUT_FILES" description:"the segments definition file (mandatory)" required:"true"`
+//  }
+
+//
+//  var extractCommand ExtractCommand
+//
+//  ////////////////////////////////////////////////////////////////////////////
+//  // Function definitions
+//
+//  func init() {
+//  	gfParser.AddCommand("extract",
+//  		"extract segments from source and splice them for smooth transition",
+//  		`Example:
+//    soxcut extract -i <inputFile> -s <segmentsFile> -o <outputFile> [sox_effects...]
+//    soxcut extract -i input1.wav -s timings.txt -o output.mp3 -f="-C 128"
+//    soxcut extract -i audio.flac -s timings.txt -o final.opus -f="-C 16" -v -- gain -n highpass 80 pad 0 5
+
+//  `,
+//  		&extractCommand)
+//  }
+//
+//  func (x *ExtractCommand) Execute(args []string) error {
+//   	fmt.Fprintf(os.Stderr, "extract segments from source and splice them for smooth transition\n")
+//   	// fmt.Fprintf(os.Stderr, "Copyright (C) 2025-2025, Tong Sun\n\n")
+//   	clis.Setup("soxcut::extract", Opts.Verbose)
+//   	clis.Verbose(1, "Doing Extract, with %+v, %+v", Opts, args)
+//   	// fmt.Println(x.FileI, x.FileS)
+//  	return x.Exec(args)
+//  }
+//
+// // Exec implements the business logic of command `extract`
+// func (x *ExtractCommand) Exec(args []string) error {
+// 	// err := ...
+// 	// clis.WarnOn("extract::Exec", err)
+// 	// or,
+// 	// clis.AbortOn("extract::Exec", err)
+// 	return nil
+// }
+// Template for "extract" CLI handling ends here
+
 // Template for "splice" CLI handling starts here
 ////////////////////////////////////////////////////////////////////////////
 // Program: soxcut
-// Purpose: sox cut tool
+// Purpose: sox wrapper tool
 // Authors: Tong Sun (c) 2025-2025, All rights reserved
 ////////////////////////////////////////////////////////////////////////////
 
@@ -111,12 +178,7 @@ type OptsT struct {
 
 // The SpliceCommand type defines all the configurable options from cli.
 //  type SpliceCommand struct {
-//  	DurExcess	int	`short:"E" long:"excess" env:"SOXCUT_DUREXCESS" description:"excess duration of the cross-fade overlap in ms" default:"500"`
-//  	DurLeeway	int	`short:"L" long:"leeway" env:"SOXCUT_DURLEEWAY" description:"leeway duration for finding best splice point in ms" default:"200"`
-//  	FileI	string	`short:"i" long:"input" env:"SOXCUT_FILEI" description:"the source to cut from (mandatory)" required:"true"`
-//  	FileS	string	`short:"s" long:"segments" env:"SOXCUT_FILES" description:"the segments definition file (mandatory)" required:"true"`
-//  	FileO	string	`short:"o" long:"output" env:"SOXCUT_FILEO" description:"the final output file" default:"output.mp3"`
-//  	FmtOpt	string	`short:"f" long:"fopts" env:"SOXCUT_FMTOPT" description:"fopts (format options) for the output file"`
+//  	FileList	string	`short:"l" long:"list" env:"SOXCUT_FILELIST" description:"the list file containing sources to splice (mandatory)" required:"true"`
 //  }
 
 //
@@ -127,22 +189,20 @@ type OptsT struct {
 //
 //  func init() {
 //  	gfParser.AddCommand("splice",
-//  		"sox splice for smooth transition",
+//  		"splice sources for smooth transition",
 //  		`Example:
-//    soxcut splice -i <inputFile> -s <segmentsFile> -o <outputFile> [sox_effects...]
-//    soxcut splice -i input1.wav -s timings.txt -o output.mp3 -f="-C 128"
-//    soxcut splice -i audio.flac -s timings.txt -o final.opus -f="-C 16" -v -- gain -n highpass 80 pad 0 5
+//    soxcut splice -l <listFile> -o <outputFile> [sox_effects...]
 
 //  `,
 //  		&spliceCommand)
 //  }
 //
 //  func (x *SpliceCommand) Execute(args []string) error {
-//   	fmt.Fprintf(os.Stderr, "sox splice for smooth transition\n")
+//   	fmt.Fprintf(os.Stderr, "splice sources for smooth transition\n")
 //   	// fmt.Fprintf(os.Stderr, "Copyright (C) 2025-2025, Tong Sun\n\n")
 //   	clis.Setup("soxcut::splice", Opts.Verbose)
 //   	clis.Verbose(1, "Doing Splice, with %+v, %+v", Opts, args)
-//   	// fmt.Println(x.DurExcess, x.DurLeeway, x.FileI, x.FileS, x.FileO, x.FmtOpt)
+//   	// fmt.Println(x.FileList)
 //  	return x.Exec(args)
 //  }
 //
