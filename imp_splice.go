@@ -13,5 +13,6 @@ func (x *SpliceCommand) Exec(args []string) error {
 	// clis.WarnOn("splice::Exec", err)
 	// or,
 	// clis.AbortOn("splice::Exec", err)
+	soxjoin(args)
 	return nil
 }

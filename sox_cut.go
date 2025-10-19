@@ -37,14 +37,14 @@ type ClipTiming struct {
 	End   time.Duration
 }
 
+//==========================================================================
+// Main entrances
+
+// ..........................................................................
 func soxcut(args []string) {
 
-	excessDuration = time.Duration(Opts.DurExcess) * time.Millisecond
-	leewayDuration = time.Duration(Opts.DurLeeway) * time.Millisecond
 	inputFile = extractCommand.FileI
-	outputFile = Opts.FileO
 	timingsFile = extractCommand.FileS
-	var soxOptions []string = args
 
 	// Dependency Check: Ensure sox is installed.
 	if !commandExists("sox") {
@@ -52,8 +52,7 @@ func soxcut(args []string) {
 	}
 	//log.Println("Found SoX executable.")
 
-	log.Printf("Audio Splicer started with excess: %v, leeway: %v\n",
-		excessDuration, leewayDuration)
+	log.Println("Audio Extracter started")
 	// Read and parse the clip timings file.
 	timings, err := parseTimingsFile(timingsFile)
 	if err != nil {
@@ -78,9 +77,21 @@ func soxcut(args []string) {
 		log.Fatalf("Failed during clip preparation: %v", err)
 	}
 	log.Println("All clips extracted and prepared successfully.")
+	soxsplice(args, preparedClipPaths, tempDir)
+}
 
-	// Splice the prepared clips together.
-	finalClipPath, err := spliceClips(preparedClipPaths, timings, tempDir)
+// ..........................................................................
+func soxsplice(args, preparedClipPaths []string, tempDir string) {
+	excessDuration = time.Duration(Opts.DurExcess) * time.Millisecond
+	leewayDuration = time.Duration(Opts.DurLeeway) * time.Millisecond
+	outputFile = Opts.FileO
+	var soxOptions []string = args
+
+	log.Printf("Splicer started with excess: %v, leeway: %v\n",
+		excessDuration, leewayDuration)
+
+	// Splice the given clips together.
+	finalClipPath, err := spliceClips(preparedClipPaths, tempDir)
 	if err != nil {
 		log.Fatalf("Failed during splicing: %v", err)
 	}
@@ -104,6 +115,38 @@ func soxcut(args []string) {
 	log.Printf("Processing complete! Final audio saved to: %s", outputFile)
 }
 
+// ..........................................................................
+func soxjoin(args []string) {
+
+	inputFile = spliceCommand.FileList
+
+	// Dependency Check: Ensure sox is installed.
+	if !commandExists("sox") {
+		log.Fatal("SoX not found in PATH. Please install it to continue.")
+	}
+
+	log.Println("Audio Splicer started")
+	// Read and parse the list file.
+	clipPaths, err := parseListFile(inputFile)
+	if err != nil {
+		log.Fatalf("Error reading list file '%s': %v", inputFile, err)
+	}
+
+	// Create a temporary directory for intermediate files.
+	tempDir, err := os.MkdirTemp("", "sc_*")
+	if err != nil {
+		log.Fatalf("Failed to create temporary directory: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+	log.Printf("Temporary directory created at: %s", tempDir)
+
+	soxsplice(args, clipPaths, tempDir)
+}
+
+//==========================================================================
+// Support functions
+
+// ..........................................................................
 // prepareClips loops through the timings, trimming each clip from the source
 // with the correct excess/leeway for perfect splicing.
 func prepareClips(timings []ClipTiming, tempDir string) ([]string, error) {
@@ -159,17 +202,16 @@ func prepareClips(timings []ClipTiming, tempDir string) ([]string, error) {
 	return preparedClipPaths, nil
 }
 
+// ..........................................................................
 // spliceClips iteratively joins the prepared clips using the splice effect.
-func spliceClips(clipPaths []string, timings []ClipTiming, tempDir string) (string, error) {
+func spliceClips(clipPaths []string, tempDir string) (string, error) {
 	if len(clipPaths) <= 1 {
 		return clipPaths[0], nil // Only one clip, no splicing needed.
 	}
 
 	currentCombinedFile := clipPaths[0]
-	accumulatedIdealDuration := timings[0].End - timings[0].Start
 
 	for i := 1; i < len(clipPaths); i++ {
-		log.Printf(" -> Splicing clip %d at joint point: %v", i+1, accumulatedIdealDuration)
 		nextClip := clipPaths[i]
 		tempOutputFile := filepath.Join(tempDir, fmt.Sprintf("combined_%d.wav", i))
 
@@ -180,6 +222,7 @@ func spliceClips(clipPaths []string, timings []ClipTiming, tempDir string) (stri
 			return "", fmt.Errorf("could not get duration of '%s': %v", currentCombinedFile, err)
 		}
 
+		fmt.Printf(" -> Splicing clip %d at joint point: %v\n", i+1, splicePos)
 		spliceArgs := fmt.Sprintf("%f,%f,%f", splicePos.Seconds(), excessDuration.Seconds(), leewayDuration.Seconds())
 
 		cmd := exec.Command("sox", currentCombinedFile, nextClip, tempOutputFile, "splice", "-q", spliceArgs)
@@ -187,7 +230,6 @@ func spliceClips(clipPaths []string, timings []ClipTiming, tempDir string) (stri
 			return "", fmt.Errorf("failed to splice clip %d: %v\nOutput: %s", i+1, err, string(output))
 		}
 		currentCombinedFile = tempOutputFile
-		accumulatedIdealDuration += (timings[i].End - timings[i].Start)
 	}
 	return currentCombinedFile, nil
 }
@@ -209,6 +251,7 @@ func getAudioDuration(filePath string) (time.Duration, error) {
 	return time.Duration(durationSec * float64(time.Second)), nil
 }
 
+// ..........................................................................
 // parseTimingsFile reads the HH:MM:SS.mmm formatted file.
 func parseTimingsFile(filePath string) ([]ClipTiming, error) {
 	file, err := os.Open(filePath)
@@ -244,6 +287,29 @@ func parseTimingsFile(filePath string) ([]ClipTiming, error) {
 	}
 
 	return timings, scanner.Err()
+}
+
+// ..........................................................................
+//
+//	parseListFile reads the audio list file.
+func parseListFile(filePath string) ([]string, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var lines []string
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") { // Skip empty lines and comments
+			continue
+		}
+		lines = append(lines, line)
+	}
+
+	return lines, scanner.Err()
 }
 
 var durationFormat = []string{"", "05", "04:05", "15:04:05"}
